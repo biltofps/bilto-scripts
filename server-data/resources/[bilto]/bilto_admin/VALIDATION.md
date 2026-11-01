@@ -1,169 +1,60 @@
-# Validation Checklist
+# Validação
 
-Data: 2026-06-15
+Ordem: testes automáticos → checklist em jogo. Marque cada item; qualquer falha bloqueia o deploy.
 
-## 1. Self-test obrigatorio
+## 1. Automáticos
 
-1. Inicie o recurso.
-2. Rode `bilto_admin_selfcheck` no console do servidor.
-3. Resultado esperado:
-- `ok=true`
-- zero issues
+### 1.1 Self-check do servidor
+No console: `bilto_admin_selfcheck`. Esperado: `selfcheck ok (N checks passed, 0 issue(s))`.
 
-Esse self-test valida:
-- dependencias obrigatorias online
-- conflitos de comandos
-- mapa de acoes/permissoes
-- consistencia entre `ui/script.js` e `ui/index.html`
-- correspondencia entre `data-panel-target` e `data-panel`
+Cobre: dependências iniciadas; validação completa da config; exports externos usados (`rsg-multijob`, `rsg-bossmenu`, `rsg-inventory`); toda ação com chave de permissão; toda URL de webhook ligada a uma ação real; store de permissões carregado e cada cargo com permissões; paridade de chaves pt-BR/en; toda chave de locale citada no código (Lua, JS, HTML, prefixos dinâmicos) existe; todo `byId()` da NUI existe no HTML; toda aba tem painel; testes de `Admin.text/key/int/num`, interpolação com `%`, rótulo de ban permanente, `parsePermissionSet`, source inválida sem acesso, `runAction` rejeitando payload ruim.
 
-## 2. Acesso e permissao
+### 1.2 Fluxo da NUI
+Na pasta do recurso: `node tests/nui_flow.test.js .` (sem Node: `set ELECTRON_RUN_AS_NODE=1` e use o `Code.exe` do VS Code no lugar de `node`). Esperado: `flow: ALL OK`.
 
-1. Entrar com um player sem permissao.
-2. Executar `/admin`.
-3. Resultado esperado:
-- painel nao abre
-- toast/comando informa negacao
+Cobre: init com o locale real, estado completo, todos os modais e confirmações, 38 das 39 ações com o payload enviado ao servidor, pilha de modais/ESC, toast, fechar e reabrir sem catálogo; falha em qualquer exceção ou chave de locale ausente em runtime.
 
-4. Entrar com um player autorizado.
-5. Executar `/admin`.
-6. Resultado esperado:
-- painel abre
-- Dashboard renderiza
-- nenhuma aba fica vazia por erro de JS
+## 2. Em jogo
 
-## 3. Dashboard / Players
+Prepare: um admin GOD (ACE `rsgcore.god`), um jogador sem cargo, um jogador alvo.
 
-1. Confirmar metricas online, slots, staff, mortos e ping.
-2. Confirmar totais globais de money.
-3. Buscar player por nome, source e citizenid.
-4. Selecionar player e entrar em Support.
+### Acesso
+- [ ] Sem cargo: `/admin` e PGDN mostram "sem permissão"; `/nc` mostra "sem permissão para noclip".
+- [ ] GOD: painel abre com Dashboard; PGDN fecha; ESC fecha; reabrir não reenvia catálogos (debug mostra só `state`).
+- [ ] Dar cargo `helper` ao jogador pela aba Permissões → ele abre o painel, só vê as abas/botões de helper, ganha `rsgcore.helper` (testar um comando rsg-core de helper) e perde ao remover o cargo.
+- [ ] Editar o cargo `helper` (desmarcar `goto`) → o botão some para o helper após atualizar; chamar a ação mesmo assim (devtools) → "Sem permissão".
+- [ ] Reiniciar o recurso: cargos e permissões editadas continuam; ACEs reaplicados aos online.
 
-## 4. Support actions
+### Dashboard / Players
+- [ ] Métricas, total de dinheiro (só tipos `inTotal`), top 10 e jobs por duty corretos.
+- [ ] Busca por nome, id, citizenid e job; Ir até / Trazer na linha.
 
-Executar em um alvo online:
-- `goto`
-- `bring`
-- `spectate` on/off
-- `revive`
-- `heal`
-- `toggleFreeze`
+### Suporte (alvo online)
+- [ ] goto, bring, revive, heal (vida/fome/sede/stamina), raio, freeze/unfreeze (toast no alvo), spectate liga/desliga e restaura posição.
+- [ ] Abrir inventário: painel fecha e o inventário do alvo abre; mover itens só funciona perto do alvo.
+- [ ] Setar job (grade válida) → job muda e aparece na multijob; Salvar na Multijob com e sem "ativo"; limite de jobs → mensagem de limite.
+- [ ] Remover job: job da multijob some; remover o job ativo deixa "unemployed".
+- [ ] Itens: fila, quantidades, peso insuficiente bloqueia, envio adiciona e notifica o alvo; item sem slot → mensagem de slot.
+- [ ] Dinheiro: adicionar/remover por tipo; remover acima do saldo → erro com saldo atual; total do dashboard atualiza.
+- [ ] Peso/slots: adicionar/remover; remover abaixo do usado → mensagem com o máximo removível.
+- [ ] Renomear e altura: alvo avisado, kick após `Config.RelogKickSeconds`, valor persiste no relog.
+- [ ] Limpar inventário.
 
-Resultado esperado:
-- feedback na NUI
-- efeito real no alvo
-- spectate limpa corretamente ao desligar
+### Moderação
+- [ ] Mensagem privada aparece no alvo com título de mensagem do administrador.
+- [ ] Kick com e sem motivo.
+- [ ] Ban por dias e permanente → aparece na lista (com license); editar prolonga; remover tira da lista; o banido não entra.
 
-## 5. Inventory / economy / job
+### Utilidades / Teleportes
+- [ ] Copiar coordenadas (cada formato vai para a área de transferência).
+- [ ] Blips e wall ligam/desligam repetidas vezes; wall mostra cargo colorido, CID, ID, nome, vida e arma (sacar/guardar arma reflete em ~0,5s).
+- [ ] Noclip pelo botão e por `/nc`; velocidades; desligar devolve colisão/visibilidade.
+- [ ] Cavalo admin; baú de empresa (jobs de `Config.CompanyStashes`) abre o mesmo conteúdo que o chefe vê no rsg-bossmenu e o painel fecha.
+- [ ] Teleportar para cidade, para coordenadas, adicionar local (com "usar localização atual"), remover local.
 
-Executar:
-- `openInventory`
-- `addItem`
-- `checkItemCapacity`
-- `addMoney`
-- `removeMoney`
-- `addWeight`
-- `addSlots`
-- `setJob`
-- `upsertMultijobJob`
-- `removeJob`
-- `clearInventory`
-
-Resultado esperado:
-- limites respeitados
-- mensagens de erro coerentes para entradas invalidas
-- alteracoes persistem conforme o contrato do framework
-
-## 6. Character maintenance
-
-Executar:
-- `renameCharacter`
-- `changeHeight`
-- `findCharacterByCitizenid`
-- `deleteCharacterByCitizenid`
-
-Cobrir:
-- personagem offline
-- personagem online
-- citizenid invalida
-
-Resultado esperado:
-- rename/height kickam o alvo e persistem
-- delete offline limpa tabelas elegiveis
-- delete online agenda kick + limpeza
-
-## 7. Moderation
-
-Executar:
-- `privateMessage`
-- `kick`
-- `banPlayer`
-- `editBan`
-- `removeBan`
-
-Resultado esperado:
-- target recebe PM
-- kick remove do servidor
-- ban aparece na lista
-- edicao altera expiracao
-- remocao tira o registro ativo
-
-## 8. Utilities / runtime client
-
-Executar:
-- `copyCoords`
-- `togglePlayerBlips`
-- `togglePlayerWall`
-- `toggleNoclip`
-- `spawnAdminHorse`
-- `openCompanyStash`
-
-Resultado esperado:
-- clipboard copia via callback NUI
-- blips e wall podem ligar/desligar repetidamente
-- noclip liga/desliga sem deixar entidade presa
-- cavalo spawnado corretamente
-- stash abre no admin
-
-## 9. Permissions
-
-Executar:
-- `permissionAddPlayer`
-- `permissionUpdatePlayer`
-- `permissionRemovePlayer`
-- `permissionPresetUpdate`
-
-Cobrir:
-- usuario com `manage_permissions`
-- usuario sem `manage_permissions`
-
-Resultado esperado:
-- ACL customizada aplica/remove corretamente
-- presets refletem na UI
-- negacoes de permissao bloqueiam acao no server
-
-## 10. Restart / reload / cleanup
-
-1. Abrir painel.
-2. Ativar wall, blips, noclip e spectate.
-3. Reiniciar o resource.
-4. Resultado esperado:
-- foco NUI liberado
-- spectate desligado
-- freeze local limpo
-- blips removidos
-- wall state resetado
-
-## 11. Entradas maliciosas / edge cases
-
-Testar:
-- strings acima do limite em PM, kick, ban, rename
-- valores negativos/zero para item, money, peso e slots
-- targetSource invalido
-- action inexistente via callback NUI
-- abrir duas acoes criticas rapidamente
-
-Resultado esperado:
-- server rejeita payload
-- lock de acao impede corrida do mesmo admin
-- nenhuma acao executa fora da permissao esperada
+### Robustez
+- [ ] Clicar rápido duas vezes em uma ação → "Aguarde a ação anterior".
+- [ ] Payload malicioso via devtools da NUI (`performAction` com `targetSource: -1`, `amount: 1e309`, `moneyType: "x'; --"`, `items: "x"`, `presetKey: "god"`) → todos recusados com mensagem.
+- [ ] Alvo sai durante spectate/freeze → admin sai do spectate; estado limpo.
+- [ ] `restart bilto_admin` com painel aberto, wall, blips, noclip, freeze e spectate ativos → foco liberado, tudo desligado, ACEs da staff removidos e reaplicados no start.
+- [ ] `Config.Debug = true`: ações aparecem no console; uma chave de locale removida aparece como aviso e no self-check.

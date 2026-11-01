@@ -1,292 +1,204 @@
-Config = Config or {}
+Config = {}
 
--- ## Permissions ## (mesmos grupos rsgcore.<group> do server.cfg)
--- Checked from top to bottom: the first group the player has is the one applied, so keep
--- the highest group first. A player gets a group from server.cfg or from the panel.
--- The group with `all_permissions = true` (GOD) is fixed: it sees everything and is the only
--- one that edits the other roles and gives them to players in the panel ("Permissoes" tab).
--- The permissions below are only the starting value of each role: on first start they are
--- saved in the database (with the hierarchy applied) and from then on the panel is what counts.
--- Options a role can't use are hidden from its NUI.
-Config.FrameworkRoles = {
-    -- ###################### GOD ######################
-    {
-        group = 'god',
-        label = 'God',
-        permissions = {
-            all_permissions = true
-        }
-    },
-    -- ################### HEADADMIN ###################
-    {
-        group = 'headadmin',
-        label = 'Head Admin',
-        permissions = {}
-    },
-    -- ################### DEVELOPER ###################
+-- Active locale (key of Config.Locales in locale.lua).
+Config.Locale = 'en'
+
+-- Structured debug logs on server console, client F8 and NUI devtools.
+Config.Debug = false
+
+-- Chat commands.
+Config.Command = 'admin'
+Config.NoclipCommand = 'nc'
+
+-- ## Roles ## (the rsgcore.<group> groups of server.cfg)
+-- Checked from top to bottom: the first role a player has wins, so keep the highest first.
+-- A player gets a role from server.cfg (ACE) or from the panel ("Permissions" tab).
+-- The role with `all = true` is fixed: it can do everything and is the only one that
+-- edits the other roles and gives roles to players in the panel.
+-- `permissions` + `inherits` are only the first value of each role: on first start the
+-- merged result is saved in `bilto_admin_roles` and from then on the panel is what counts.
+Config.Roles = {
+    { group = 'god', label = 'God', color = 'red', all = true },
+    { group = 'headadmin', label = 'Head Admin', color = 'red', inherits = 'developer', permissions = {} },
     {
         group = 'developer',
         label = 'Developer',
+        inherits = 'admin',
+        color = 'yellow',
         permissions = {
-            addMoney = true,
-            removeMoney = true,
-            addWeight = true,
-            addSlots = true,
-            removeWeight = true,
-            removeSlots = true,
-            spawnAdminHorse = true
+            'addMoney', 'removeMoney', 'addWeight', 'addSlots', 'removeWeight', 'removeSlots', 'spawnAdminHorse'
         }
     },
-    -- ##################### ADMIN #####################
     {
         group = 'admin',
         label = 'Admin',
+        color = 'red',
+        inherits = 'mod',
         permissions = {
-            editBan = true,
-            removeBan = true,
-            setJob = true,
-            upsertMultijobJob = true,
-            removeJob = true,
-            addItem = true,
-            checkItemCapacity = true,
-            clearInventory = true,
-            renameCharacter = true,
-            changeHeight = true,
-            openCompanyStash = true,
-            manageTeleportLocations = true,
-            executeLightning = true
+            'editBan', 'removeBan', 'setJob', 'upsertMultijobJob', 'removeJob', 'addItem', 'checkItemCapacity',
+            'clearInventory', 'renameCharacter', 'changeHeight', 'openCompanyStash', 'manageTeleportLocations',
+            'executeLightning'
         }
     },
-    -- ##################### MOD #######################
     {
         group = 'mod',
         label = 'Moderador',
+        color = 'red',
+        inherits = 'helper',
         permissions = {
-            toggleFreeze = true,
-            kick = true,
-            banPlayer = true,
-            viewBannedPlayers = true,
-            openInventory = true,
-            togglePlayerBlips = true,
-            togglePlayerWall = true
+            'toggleFreeze', 'kick', 'banPlayer', 'viewBannedPlayers', 'openInventory', 'togglePlayerBlips',
+            'togglePlayerWall'
         }
     },
-    -- #################### HELPER #####################
     {
         group = 'helper',
         label = 'Helper',
+        color = 'blue',
         permissions = {
-            ['goto'] = true,
-            bring = true,
-            revive = true,
-            heal = true,
-            spectate = true,
-            privateMessage = true,
-            teleportToCoords = true,
-            copyCoords = true,
-            viewUtilitiesPanel = true,
-            toggleNoclip = true
+            'goto', 'bring', 'revive', 'heal', 'spectate', 'privateMessage', 'teleportToCoords', 'copyCoords',
+            'viewUtilitiesPanel', 'toggleNoclip'
         }
     }
 }
 
--- Permission Group Inheritance Hierarchy (igual ao server.cfg: { grupo, herda_de })
-Config.FrameworkHierarchy = {
-    { 'god', 'headadmin' },       -- GOD inherits HEADADMIN rights
-    { 'headadmin', 'developer' }, -- HEADADMIN inherits DEVELOPER rights
-    { 'developer', 'admin' },     -- DEVELOPER inherits ADMIN rights
-    { 'admin', 'mod' },           -- ADMIN inherits MOD rights
-    { 'mod', 'helper' }           -- MOD inherits HELPER rights
-}
+-- Discord audit log: one webhook URL per action (leave an action out to not log it).
+local AUDIT_WEBHOOK = 'https://discord.com/api/webhooks/1503625558087569478/AKgQ_4zCI5ha1VEZctbifr-00bfSbg7Wufr0ijGpbz96J1wTdcnWw795pjMt3pcoNLMc'
 
--- Optional panel command name used by runtime normalization.
-Config.Command = 'admin'
-
--- Default private message duration shown to the target player (ms).
-Config.PrivateMessageDuration = 9000
-
--- Active locale key (must exist in locale.lua).
-Config.Locale = 'en'
-
--- One Discord webhook per completed admin action. Leave an URL empty to disable its log.
-Config.Webhooks = {
-    ['goto'] = 'https://discord.com/api/webhooks/1503625558087569478/AKgQ_4zCI5ha1VEZctbifr-00bfSbg7Wufr0ijGpbz96J1wTdcnWw795pjMt3pcoNLMc',
-    bring = 'https://discord.com/api/webhooks/1503625558087569478/AKgQ_4zCI5ha1VEZctbifr-00bfSbg7Wufr0ijGpbz96J1wTdcnWw795pjMt3pcoNLMc',
-    revive = 'https://discord.com/api/webhooks/1503625558087569478/AKgQ_4zCI5ha1VEZctbifr-00bfSbg7Wufr0ijGpbz96J1wTdcnWw795pjMt3pcoNLMc',
-    heal = 'https://discord.com/api/webhooks/1503625558087569478/AKgQ_4zCI5ha1VEZctbifr-00bfSbg7Wufr0ijGpbz96J1wTdcnWw795pjMt3pcoNLMc',
-    executeLightning = 'https://discord.com/api/webhooks/1503625558087569478/AKgQ_4zCI5ha1VEZctbifr-00bfSbg7Wufr0ijGpbz96J1wTdcnWw795pjMt3pcoNLMc',
-    toggleFreeze = 'https://discord.com/api/webhooks/1503625558087569478/AKgQ_4zCI5ha1VEZctbifr-00bfSbg7Wufr0ijGpbz96J1wTdcnWw795pjMt3pcoNLMc',
-    spectate = 'https://discord.com/api/webhooks/1503625558087569478/AKgQ_4zCI5ha1VEZctbifr-00bfSbg7Wufr0ijGpbz96J1wTdcnWw795pjMt3pcoNLMc',
-    openInventory = 'https://discord.com/api/webhooks/1503625558087569478/AKgQ_4zCI5ha1VEZctbifr-00bfSbg7Wufr0ijGpbz96J1wTdcnWw795pjMt3pcoNLMc',
-    openCompanyStash = 'https://discord.com/api/webhooks/1503625558087569478/AKgQ_4zCI5ha1VEZctbifr-00bfSbg7Wufr0ijGpbz96J1wTdcnWw795pjMt3pcoNLMc',
-    togglePlayerBlips = 'https://discord.com/api/webhooks/1503625558087569478/AKgQ_4zCI5ha1VEZctbifr-00bfSbg7Wufr0ijGpbz96J1wTdcnWw795pjMt3pcoNLMc',
-    togglePlayerWall = 'https://discord.com/api/webhooks/1503625558087569478/AKgQ_4zCI5ha1VEZctbifr-00bfSbg7Wufr0ijGpbz96J1wTdcnWw795pjMt3pcoNLMc',
-    toggleNoclip = 'https://discord.com/api/webhooks/1503625558087569478/AKgQ_4zCI5ha1VEZctbifr-00bfSbg7Wufr0ijGpbz96J1wTdcnWw795pjMt3pcoNLMc',
-    spawnAdminHorse = 'https://discord.com/api/webhooks/1503625558087569478/AKgQ_4zCI5ha1VEZctbifr-00bfSbg7Wufr0ijGpbz96J1wTdcnWw795pjMt3pcoNLMc',
-    kick = 'https://discord.com/api/webhooks/1503625558087569478/AKgQ_4zCI5ha1VEZctbifr-00bfSbg7Wufr0ijGpbz96J1wTdcnWw795pjMt3pcoNLMc',
-    privateMessage = 'https://discord.com/api/webhooks/1503625558087569478/AKgQ_4zCI5ha1VEZctbifr-00bfSbg7Wufr0ijGpbz96J1wTdcnWw795pjMt3pcoNLMc',
-    setJob = 'https://discord.com/api/webhooks/1503625558087569478/AKgQ_4zCI5ha1VEZctbifr-00bfSbg7Wufr0ijGpbz96J1wTdcnWw795pjMt3pcoNLMc',
-    upsertMultijobJob = 'https://discord.com/api/webhooks/1503625558087569478/AKgQ_4zCI5ha1VEZctbifr-00bfSbg7Wufr0ijGpbz96J1wTdcnWw795pjMt3pcoNLMc',
-    removeJob = 'https://discord.com/api/webhooks/1503625558087569478/AKgQ_4zCI5ha1VEZctbifr-00bfSbg7Wufr0ijGpbz96J1wTdcnWw795pjMt3pcoNLMc',
-    banPlayer = 'https://discord.com/api/webhooks/1503625558087569478/AKgQ_4zCI5ha1VEZctbifr-00bfSbg7Wufr0ijGpbz96J1wTdcnWw795pjMt3pcoNLMc',
-    editBan = 'https://discord.com/api/webhooks/1503625558087569478/AKgQ_4zCI5ha1VEZctbifr-00bfSbg7Wufr0ijGpbz96J1wTdcnWw795pjMt3pcoNLMc',
-    removeBan = 'https://discord.com/api/webhooks/1503625558087569478/AKgQ_4zCI5ha1VEZctbifr-00bfSbg7Wufr0ijGpbz96J1wTdcnWw795pjMt3pcoNLMc',
-    addItem = 'https://discord.com/api/webhooks/1503625558087569478/AKgQ_4zCI5ha1VEZctbifr-00bfSbg7Wufr0ijGpbz96J1wTdcnWw795pjMt3pcoNLMc',
-    checkItemCapacity = 'https://discord.com/api/webhooks/1503625558087569478/AKgQ_4zCI5ha1VEZctbifr-00bfSbg7Wufr0ijGpbz96J1wTdcnWw795pjMt3pcoNLMc',
-    addMoney = 'https://discord.com/api/webhooks/1503625558087569478/AKgQ_4zCI5ha1VEZctbifr-00bfSbg7Wufr0ijGpbz96J1wTdcnWw795pjMt3pcoNLMc',
-    removeMoney = 'https://discord.com/api/webhooks/1503625558087569478/AKgQ_4zCI5ha1VEZctbifr-00bfSbg7Wufr0ijGpbz96J1wTdcnWw795pjMt3pcoNLMc',
-    addWeight = 'https://discord.com/api/webhooks/1503625558087569478/AKgQ_4zCI5ha1VEZctbifr-00bfSbg7Wufr0ijGpbz96J1wTdcnWw795pjMt3pcoNLMc',
-    addSlots = 'https://discord.com/api/webhooks/1503625558087569478/AKgQ_4zCI5ha1VEZctbifr-00bfSbg7Wufr0ijGpbz96J1wTdcnWw795pjMt3pcoNLMc',
-    removeWeight = 'https://discord.com/api/webhooks/1503625558087569478/AKgQ_4zCI5ha1VEZctbifr-00bfSbg7Wufr0ijGpbz96J1wTdcnWw795pjMt3pcoNLMc',
-    removeSlots = 'https://discord.com/api/webhooks/1503625558087569478/AKgQ_4zCI5ha1VEZctbifr-00bfSbg7Wufr0ijGpbz96J1wTdcnWw795pjMt3pcoNLMc',
-    renameCharacter = 'https://discord.com/api/webhooks/1503625558087569478/AKgQ_4zCI5ha1VEZctbifr-00bfSbg7Wufr0ijGpbz96J1wTdcnWw795pjMt3pcoNLMc',
-    changeHeight = 'https://discord.com/api/webhooks/1503625558087569478/AKgQ_4zCI5ha1VEZctbifr-00bfSbg7Wufr0ijGpbz96J1wTdcnWw795pjMt3pcoNLMc',
-    clearInventory = 'https://discord.com/api/webhooks/1503625558087569478/AKgQ_4zCI5ha1VEZctbifr-00bfSbg7Wufr0ijGpbz96J1wTdcnWw795pjMt3pcoNLMc',
-    permissionAddPlayer = 'https://discord.com/api/webhooks/1503625558087569478/AKgQ_4zCI5ha1VEZctbifr-00bfSbg7Wufr0ijGpbz96J1wTdcnWw795pjMt3pcoNLMc',
-    permissionUpdatePlayer = 'https://discord.com/api/webhooks/1503625558087569478/AKgQ_4zCI5ha1VEZctbifr-00bfSbg7Wufr0ijGpbz96J1wTdcnWw795pjMt3pcoNLMc',
-    permissionRemovePlayer = 'https://discord.com/api/webhooks/1503625558087569478/AKgQ_4zCI5ha1VEZctbifr-00bfSbg7Wufr0ijGpbz96J1wTdcnWw795pjMt3pcoNLMc',
-    permissionPresetUpdate = 'https://discord.com/api/webhooks/1503625558087569478/AKgQ_4zCI5ha1VEZctbifr-00bfSbg7Wufr0ijGpbz96J1wTdcnWw795pjMt3pcoNLMc',
-    deleteCharacterByCitizenid = 'https://discord.com/api/webhooks/1503625558087569478/AKgQ_4zCI5ha1VEZctbifr-00bfSbg7Wufr0ijGpbz96J1wTdcnWw795pjMt3pcoNLMc'
-}
-
--- UI and NUI runtime behavior.
-Config.Ui = {
-    title = 'Bilto Admin',
-    refreshCooldownMs = 1500,
-    modalDebug = false,
-    openKeyHash = 0x3C3DD371, -- PGDN (RSGCore.KeyBinds['PGDN'])
-    openKeyDebounceMs = 300
-}
-
--- Notification timing (milliseconds).
-Config.Notifications = {
-    defaultDuration = 3000,
-    adminDuration = 5000,
-    targetDuration = 5200
-}
-
--- Job behavior used by "remove job" fallback.
-Config.Jobs = {
-    removeJobTarget = {
-        name = 'unemployed',
-        grade = 0
-    }
-}
-
--- Money types available in panel actions and dashboard summaries.
-Config.MoneyTypes = {
-    { label = 'Dollar', value = 'cash' },
-    { label = 'Gold', value = 'gold' },
-    { label = 'Dirty Money', value = 'bloodmoney' },
-    { label = 'Valentine Bank', value = 'valbank' },
-    { label = 'Armadillo Bank', value = 'armbank' },
-    { label = 'Rhodes Bank', value = 'rhobank' },
-    { label = 'Blackwater Bank', value = 'blkbank' },
-    { label = 'Saint Denis Bank', value = 'bank' }
-}
-
--- Framework base money type for "cash on hand".
-Config.Money = {
-    cashType = 'cash'
-}
-
--- Storage settings for custom panel permissions.
-Config.Permissions = {
-    tableName = 'bilto_admin_permissions',
-    -- Permissions of each framework role, edited by GOD in the panel (seeded from Config.FrameworkRoles).
-    presetsTableName = 'bilto_admin_role_permissions'
-}
-
--- Optional custom action catalog/permission overrides.
-Config.PanelActions = {
-    manage = {},
-    definitions = {}
-}
-
--- Ban settings used by moderation actions.
-Config.Ban = {
-    defaultReason = 'Banido pela administracao.',
-    dayPresets = { 1, 3, 7, 15, 30 },
-    maxDays = 3650,
-    permanentExpire = 2147483647
-}
-
--- Server-side cache/performance tuning.
-Config.Performance = {
-    globalMoneyCacheMs = 15000,
-    blipPlayersCacheMs = 300
-}
-
--- Safety limits for admin actions.
-Config.Limits = {
-    moneyActionMax = 100000000,
-    addItemAmountMax = 1000,
-    checkItemAmountMax = 1000,
-    addWeightAmountMax = 100000000,
-    addSlotsAmountMax = 1000
-}
-
--- Security and anti-spam controls.
-Config.Security = {
-    panelStateCacheMs = 350,
-    wallWeaponStateMinIntervalMs = 90,
-    actionLockEnabled = true
-}
-
--- Optional structured logs.
-Config.Observability = {
-    enabled = false,
-    logActions = false
-}
-
--- Shared visual settings for administrative action webhooks.
 Config.Webhook = {
     username = 'Bilto Admin',
     avatarUrl = '',
-    color = 3447003
-}
-
-
--- Client update intervals and wall text rendering.
-Config.Client = {
-    tracking = {
-        activeIntervalMs = 500
-    },
-    wallText = {
-        maxDistance = 300.0,
-        zOffset = 1.0,
-        idleWaitMs = 250,
-        titleColor = '~t7~',
-        resetColor = '~q~'
-    },
-    wallWeaponState = {
-        stateBagKey = 'bitinho_wall_weapon',
-        armedIntervalMs = 180,
-        unarmedIntervalMs = 450
+    color = 3447003,
+    urls = {
+        ['goto'] = AUDIT_WEBHOOK,
+        bring = AUDIT_WEBHOOK,
+        revive = AUDIT_WEBHOOK,
+        heal = AUDIT_WEBHOOK,
+        executeLightning = AUDIT_WEBHOOK,
+        toggleFreeze = AUDIT_WEBHOOK,
+        spectate = AUDIT_WEBHOOK,
+        openInventory = AUDIT_WEBHOOK,
+        openCompanyStash = AUDIT_WEBHOOK,
+        togglePlayerBlips = AUDIT_WEBHOOK,
+        togglePlayerWall = AUDIT_WEBHOOK,
+        toggleNoclip = AUDIT_WEBHOOK,
+        spawnAdminHorse = AUDIT_WEBHOOK,
+        kick = AUDIT_WEBHOOK,
+        privateMessage = AUDIT_WEBHOOK,
+        setJob = AUDIT_WEBHOOK,
+        upsertMultijobJob = AUDIT_WEBHOOK,
+        removeJob = AUDIT_WEBHOOK,
+        banPlayer = AUDIT_WEBHOOK,
+        editBan = AUDIT_WEBHOOK,
+        removeBan = AUDIT_WEBHOOK,
+        addItem = AUDIT_WEBHOOK,
+        checkItemCapacity = AUDIT_WEBHOOK,
+        addMoney = AUDIT_WEBHOOK,
+        removeMoney = AUDIT_WEBHOOK,
+        addWeight = AUDIT_WEBHOOK,
+        addSlots = AUDIT_WEBHOOK,
+        removeWeight = AUDIT_WEBHOOK,
+        removeSlots = AUDIT_WEBHOOK,
+        renameCharacter = AUDIT_WEBHOOK,
+        changeHeight = AUDIT_WEBHOOK,
+        clearInventory = AUDIT_WEBHOOK,
+        addTeleportLocation = AUDIT_WEBHOOK,
+        deleteTeleportLocation = AUDIT_WEBHOOK,
+        permissionAddPlayer = AUDIT_WEBHOOK,
+        permissionUpdatePlayer = AUDIT_WEBHOOK,
+        permissionRemovePlayer = AUDIT_WEBHOOK,
+        permissionPresetUpdate = AUDIT_WEBHOOK
     }
 }
 
--- Noclip settings.
+-- NUI behaviour.
+Config.Ui = {
+    title = 'Bilto Admin',
+    refreshCooldownMs = 1500,
+    openKeyHash = 0x3C3DD371, -- PGDN
+    openKeyDebounceMs = 300
+}
+
+-- Toast durations (ms).
+Config.Notifications = {
+    defaultDuration = 3000,
+    adminDuration = 5000,
+    targetDuration = 5200,
+    privateMessageDuration = 9000
+}
+
+-- Money types shown in the panel (keys must exist in rsg-core RSGConfig.Money.MoneyTypes).
+-- `inTotal` types are summed in the dashboard "total server money" card.
+Config.MoneyTypes = {
+    { key = 'cash', label = 'Dollar', inTotal = true },
+    { key = 'gold', label = 'Gold', inTotal = false },
+    { key = 'bloodmoney', label = 'Dirty Money', inTotal = false },
+    { key = 'valbank', label = 'Valentine Bank', inTotal = true },
+    { key = 'armbank', label = 'Armadillo Bank', inTotal = true },
+    { key = 'rhobank', label = 'Rhodes Bank', inTotal = true },
+    { key = 'blkbank', label = 'Blackwater Bank', inTotal = true },
+    { key = 'bank', label = 'Saint Denis Bank', inTotal = true }
+}
+-- Money on hand; the support view lists every other type under "Banks".
+Config.CashMoneyType = 'cash'
+
+-- Bans (written to rsg-core `bans` table).
+Config.Ban = {
+    defaultReason = 'Banido pela administracao.',
+    dayPresets = { 1, 3, 7, 15, 30 },
+    permanentExpire = 2147483647
+}
+
+-- Server caches (ms).
+Config.Cache = {
+    panelStateMs = 350,
+    economyMs = 15000,
+    trackedPlayersMs = 300
+}
+
+-- Upper limits of admin actions.
+Config.Limits = {
+    moneyAmount = 100000000,
+    itemAmount = 1000,
+    weightAmount = 100000000,
+    slotsAmount = 1000,
+    kickReasonLength = 180,
+    banReasonLength = 220,
+    privateMessageLength = 300,
+    nameLength = 48,
+    wallWeaponReportMinMs = 90
+}
+
+-- Seconds before a renamed / resized player is kicked to relog.
+Config.RelogKickSeconds = 5
+
+-- Client tracking (wall + blips).
+Config.Tracking = {
+    refreshMs = 500,
+    wallMaxDistance = 300.0,
+    wallZOffset = 0.95,       -- height (m) of the wall's bottom line above the player's position (lines stack upwards)
+    wallCharWidth = 0.0046,   -- estimated screen width of one character (raise it if a value touches its label)
+    wallLineHeight = 0.018,   -- screen height of each wall line
+    wallIdleWaitMs = 250,
+    weaponArmedCheckMs = 180,
+    weaponUnarmedCheckMs = 450
+}
+
+-- Noclip.
 Config.Noclip = {
-    command = 'nc',
-    speedLevels = { 0.5 ,1, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0 },
-    defaultSpeedIndex = 0.5,
+    speedLevels = { 0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0 },
+    defaultSpeedIndex = 1,
     showHud = true,
     idleWaitMs = 400,
-    hudHelpText = 'W/S: Frente/Tras | A/D: Esquerda/Direita | SPACE: Subir | SHIFT: Descer | Scroll Frente: +Vel | Scroll Tras: -Vel',
     controls = {
         increaseSpeed = { 0xCC1075A7, 0x62800C92 },
         decreaseSpeed = { 0xFD0F0C2C, 0x8BDE7443 },
-        up = 0xD9D0E1C0,
-        down = 0x8FFC75D6,
-        forward = 0x8FD015D8,
-        backward = 0xD27782E3,
-        left = 0x7065027D,
-        right = 0xB4E465B4,
-        blocked = {
-            0xB238FE0B,
-            0x3076E97C
-        }
+        up = { 0xD9D0E1C0 },
+        down = { 0x8FFC75D6 },
+        forward = { 0x8FD015D8 },
+        backward = { 0xD27782E3 },
+        left = { 0x7065027D },
+        right = { 0xB4E465B4 },
+        blocked = { 0xB238FE0B, 0x3076E97C }
     },
     behavior = {
         invincible = true,
@@ -297,44 +209,26 @@ Config.Noclip = {
     }
 }
 
--- Developer horse catalog and default horse stats.
-Config.Developer = {
-    horseOverpower = 5000.0,
-    adminHorses = {
-        {
-            id = 'arabian_white',
-            label = 'Arabian White',
-            model = 'a_c_horse_arabian_white',
-            image = 'https://images.pexels.com/photos/635499/pexels-photo-635499.jpeg?auto=compress&cs=tinysrgb&w=640&h=360&fit=crop'
-        },
-        {
-            id = 'missouri_foxtrotter',
-            label = 'Missouri Foxtrotter',
-            model = 'a_c_horse_missourifoxtrotter_sablechampagne',
-            image = 'https://images.pexels.com/photos/1996333/pexels-photo-1996333.jpeg?auto=compress&cs=tinysrgb&w=640&h=360&fit=crop'
-        },
-        {
-            id = 'nokota_whiteroan',
-            label = 'Nokota Whiteroan',
-            model = 'a_c_horse_nokota_whiteroan',
-            image = 'https://images.pexels.com/photos/1996332/pexels-photo-1996332.jpeg?auto=compress&cs=tinysrgb&w=640&h=360&fit=crop'
-        },
-        {
-            id = 'turkoman_gold',
-            label = 'Turkoman Gold',
-            model = 'a_c_horse_turkoman_gold',
-            image = 'https://images.pexels.com/photos/1996335/pexels-photo-1996335.jpeg?auto=compress&cs=tinysrgb&w=640&h=360&fit=crop'
-        },
-        {
-            id = 'thoroughbred_reverse',
-            label = 'Thoroughbred',
-            model = 'a_c_horse_thoroughbred_reversedappleblack',
-            image = 'https://images.pexels.com/photos/259280/pexels-photo-259280.jpeg?auto=compress&cs=tinysrgb&w=640&h=360&fit=crop'
-        }
-    }
+-- Company stashes (openCompanyStash): the rsg-bossmenu boss stash of each job, `boss_<job>`.
+-- Keep jobs / limits equal to rsg-bossmenu (Config.BossLocations, StorageMaxWeight, StorageMaxSlots).
+Config.CompanyStashes = {
+    jobs = { 'medic', 'vallaw', 'rholaw', 'blklaw', 'strlaw', 'stdenlaw' },
+    maxWeight = 4000000,
+    slots = 50
 }
 
--- Built-in "cities" teleport locations shown on the Teleports tab (towns category only).
+-- Admin horses (spawnAdminHorse).
+Config.AdminHorseOverpower = 5000.0
+Config.AdminHorses = {
+    { id = 'arabian_white', label = 'Arabian White', model = 'a_c_horse_arabian_white' },
+    { id = 'missouri_foxtrotter', label = 'Missouri Foxtrotter', model = 'a_c_horse_missourifoxtrotter_sablechampagne' },
+    { id = 'nokota_whiteroan', label = 'Nokota Whiteroan', model = 'a_c_horse_nokota_whiteroan' },
+    { id = 'turkoman_gold', label = 'Turkoman Gold', model = 'a_c_horse_turkoman_gold' },
+    { id = 'thoroughbred_reverse', label = 'Thoroughbred', model = 'a_c_horse_thoroughbred_reversedappleblack' }
+}
+
+-- Teleports tab: built-in towns (custom places are saved in `bilto_admin_teleports`).
+Config.TeleportCategories = { 'towns', 'gangcamps', 'nature', 'shops', 'special' }
 Config.Teleports = {
     { id = 'valentine', name = 'Valentine', description = 'Cidade de pecuaria no Heartlands', x = -302.7, y = 799.8, z = 118.5, heading = 0.0 },
     { id = 'saintdenis', name = 'Saint Denis', description = 'Maior cidade e centro industrial', x = 2638.9, y = -1180.5, z = 51.5, heading = 0.0 },

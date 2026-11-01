@@ -1,426 +1,174 @@
-local Config = type(Config) == 'table' and Config or {}
+-- Admin noclip, toggled by the server (panel button or /nc) after the permission check.
+local C = BiltoAdminClient.C
+local settings = Config.Noclip
+local controls = settings.controls
+local behavior = settings.behavior
 
-local DEFAULT_SPEED_LEVELS = { 0.5, 1.0, 2.0, 4.0, 8.0, 10.0 }
-local DEFAULT_CONTROLS = {
-    increaseSpeed = { 0xCC1075A7, 0x62800C92 },
-    decreaseSpeed = { 0xFD0F0C2C, 0x8BDE7443 },
-    up = 0xD9D0E1C0,
-    down = 0x8FFC75D6,
-    forward = 0x8FD015D8,
-    backward = 0xD27782E3,
-    left = 0x7065027D,
-    right = 0xB4E465B4,
-    blocked = {
-        0xB238FE0B,
-        0x3076E97C,
-    }
-}
+local enabled = false
+local speedIndex = settings.defaultSpeedIndex
+local movedEntity = nil -- ped, mount or vehicle being moved (frozen while noclip is on)
 
-local function trim(value)
-    if type(value) ~= 'string' then
-        return ''
+local function noclipEntity()
+    local ped = PlayerPedId()
+    local vehicle = GetVehiclePedIsIn(ped, false)
+    if vehicle ~= 0 then
+        return vehicle
     end
-    return value:gsub('^%s+', ''):gsub('%s+$', '')
+    local mount = GetMount(ped)
+    return mount ~= 0 and mount or ped
 end
 
-local function ensureString(value, fallback)
-    local output = trim(value)
-    if output == '' then
-        return fallback
+-- Peds face the opposite way of the camera heading used for movement.
+local function translateHeading(entity, heading)
+    if GetEntityType(entity) == 1 then
+        return (heading + 180) % 360
     end
-    return output
+    return heading
 end
 
-local function ensureNumber(value, fallback, minValue, maxValue)
-    local parsed = tonumber(value)
-    if parsed == nil then
-        parsed = fallback
-    end
-
-    if minValue ~= nil and parsed < minValue then
-        parsed = minValue
-    end
-    if maxValue ~= nil and parsed > maxValue then
-        parsed = maxValue
-    end
-
-    return parsed
-end
-
-local function ensureInteger(value, fallback, minValue, maxValue)
-    return math.floor(ensureNumber(value, fallback, minValue, maxValue))
-end
-
-local function ensureBoolean(value, fallback)
-    if type(value) == 'boolean' then
-        return value
-    end
-    return fallback
-end
-
-local function ensureTable(value, fallback)
-    if type(value) == 'table' then
-        return value
-    end
-    return fallback
-end
-
-local function normalizeControlList(value, fallback)
-    if type(value) == 'number' then
-        return value
-    end
-
-    local input = ensureTable(value, {})
-    local output = {}
-    for _, entry in ipairs(input) do
-        local control = tonumber(entry)
-        if control then
-            output[#output + 1] = math.floor(control)
+local function anyControl(check, list)
+    for _, control in ipairs(list) do
+        if check(0, control) then
+            return true
         end
     end
-
-    if #output == 0 then
-        return fallback
-    end
-
-    return output
+    return false
 end
 
-local function normalizeSpeedLevels(value)
-    local source = ensureTable(value, DEFAULT_SPEED_LEVELS)
-    local validated = {}
+local function disableControls(list)
+    for _, control in ipairs(list) do
+        DisableControlAction(0, control, true)
+    end
+end
 
-    for _, entry in ipairs(source) do
-        local speed = tonumber(entry)
-        if speed and speed > 0 then
-            validated[#validated + 1] = speed
+local function grab(entity)
+    movedEntity = entity
+    if behavior.freezeEntity then
+        FreezeEntityPosition(entity, true)
+    end
+    if behavior.disableCollision then
+        SetEntityCollision(entity, false, false)
+    end
+end
+
+local function release()
+    if movedEntity and DoesEntityExist(movedEntity) then
+        if behavior.freezeEntity then
+            FreezeEntityPosition(movedEntity, false)
+        end
+        if behavior.disableCollision then
+            SetEntityCollision(movedEntity, true, true)
         end
     end
+    movedEntity = nil
+end
 
-    if #validated == 0 then
-        return DEFAULT_SPEED_LEVELS
+local function drawHudText(text, y)
+    SetTextScale(0.30, 0.30)
+    SetTextColor(255, 255, 255, 255)
+    SetTextCentre(true)
+    SetTextDropshadow(1, 0, 0, 0, 200)
+    SetTextFontForCurrentCommand(0)
+    DisplayText(CreateVarString(10, 'LITERAL_STRING', text), 0.5, y)
+end
+
+local function move()
+    disableControls(controls.increaseSpeed)
+    disableControls(controls.decreaseSpeed)
+    disableControls(controls.blocked)
+
+    if settings.showHud then
+        drawHudText(C('noclip_hud_speed', { speed = settings.speedLevels[speedIndex], index = speedIndex, total = #settings.speedLevels }), 0.90)
+        drawHudText(C('noclip_hud_help'), 0.93)
     end
 
-    return validated
-end
+    if anyControl(IsDisabledControlJustReleased, controls.increaseSpeed) then
+        speedIndex = math.min(speedIndex + 1, #settings.speedLevels)
+    end
+    if anyControl(IsDisabledControlJustReleased, controls.decreaseSpeed) then
+        speedIndex = math.max(speedIndex - 1, 1)
+    end
 
-local function normalizeNoclipConfig(raw)
-    local root = ensureTable(raw, {})
-    local noclip = ensureTable(root.Noclip, {})
-    local controls = ensureTable(noclip.controls, {})
-    local behavior = ensureTable(noclip.behavior, {})
-
-    local speedLevels = normalizeSpeedLevels(noclip.speedLevels)
-
-    return {
-        SpeedLevels = speedLevels,
-        DefaultSpeedIndex = ensureInteger(noclip.defaultSpeedIndex, 1, 1, #speedLevels),
-        ShowHud = ensureBoolean(noclip.showHud, true),
-        IdleWaitMs = ensureInteger(noclip.idleWaitMs, 400, 50, 10000),
-        HudHelpText = ensureString(noclip.hudHelpText, 'W/S: Frente/Tras | A/D: Esquerda/Direita | SPACE: Subir | SHIFT: Descer | Scroll Frente: +Vel | Scroll Tras: -Vel'),
-
-        IncreaseSpeedControl = normalizeControlList(controls.increaseSpeed, DEFAULT_CONTROLS.increaseSpeed),
-        DecreaseSpeedControl = normalizeControlList(controls.decreaseSpeed, DEFAULT_CONTROLS.decreaseSpeed),
-        UpControl = normalizeControlList(controls.up, DEFAULT_CONTROLS.up),
-        DownControl = normalizeControlList(controls.down, DEFAULT_CONTROLS.down),
-        ForwardControl = normalizeControlList(controls.forward, DEFAULT_CONTROLS.forward),
-        BackwardControl = normalizeControlList(controls.backward, DEFAULT_CONTROLS.backward),
-        LeftControl = normalizeControlList(controls.left, DEFAULT_CONTROLS.left),
-        RightControl = normalizeControlList(controls.right, DEFAULT_CONTROLS.right),
-        BlockedControls = normalizeControlList(controls.blocked, DEFAULT_CONTROLS.blocked),
-
-        Behavior = {
-            invincible = ensureBoolean(behavior.invincible, true),
-            invisible = ensureBoolean(behavior.invisible, true),
-            freezeEntity = ensureBoolean(behavior.freezeEntity, true),
-            disableCollision = ensureBoolean(behavior.disableCollision, false),
-            preventRagdoll = ensureBoolean(behavior.preventRagdoll, false),
-        }
-    }
-end
-
-local Noclip = normalizeNoclipConfig(Config)
-
-local Enabled = false
-local SpeedLevels = Noclip.SpeedLevels
-local SpeedIndex = Noclip.DefaultSpeedIndex
-local Speed = SpeedLevels[SpeedIndex]
-local ShowHud = Noclip.ShowHud
-local FrozenEntity = nil
-local HudThreadRunning = false
-local EnsureHudThread
-
-local function setEntityCollisionState(entity, enabled)
-    if not entity or entity == 0 or not DoesEntityExist(entity) then
+    local forward = anyControl(IsDisabledControlPressed, controls.forward)
+    local backward = anyControl(IsDisabledControlPressed, controls.backward)
+    local left = anyControl(IsDisabledControlPressed, controls.left)
+    local right = anyControl(IsDisabledControlPressed, controls.right)
+    local up = anyControl(IsDisabledControlPressed, controls.up)
+    local down = anyControl(IsDisabledControlPressed, controls.down)
+    if not (forward or backward or left or right or up or down) then
         return
     end
 
-    if Noclip.Behavior.disableCollision then
-        SetEntityCollision(entity, enabled, enabled)
+    DisableFirstPersonCamThisFrame()
+    local entity = noclipEntity()
+    if entity ~= movedEntity then
+        release()
+        grab(entity)
     end
+    SetEntityVisible(PlayerPedId(), not behavior.invisible, false)
+
+    local speed = settings.speedLevels[speedIndex]
+    local coords = GetEntityCoords(entity)
+    local x, y, z = coords.x, coords.y, coords.z
+    local radians = -translateHeading(entity, GetEntityHeading(entity)) * math.pi / 180
+    local dx, dy = speed * math.sin(radians), speed * math.cos(radians)
+
+    if forward then x, y = x + dx, y + dy end
+    if backward then x, y = x - dx, y - dy end
+    if left then x, y = x - dy, y + dx end
+    if right then x, y = x + dy, y - dx end
+    if up then z = z + speed end
+    if down then z = z - speed end
+
+    SetEntityCoordsNoOffset(entity, x, y, z)
+    SetEntityHeading(entity, translateHeading(entity, GetGameplayCamRot(2).z))
 end
 
-local function setPedRagdollState(ped, enabled)
-    if not ped or ped == 0 or type(SetPedCanRagdoll) ~= 'function' then
+local function setEnabled(state)
+    if state == enabled then
         return
     end
-
-    if Noclip.Behavior.preventRagdoll then
-        SetPedCanRagdoll(ped, enabled)
-    end
-end
-
-local function ToggleNoclip()
-    Enabled = not Enabled
-
-    local entity = GetNoClipTarget()
+    enabled = state
     local ped = PlayerPedId()
 
-    if Enabled then
-        SetEntityInvincible(ped, Noclip.Behavior.invincible)
-        setPedRagdollState(ped, false)
-
-        if entity ~= 0 and GetEntityType(entity) == 1 then
+    if enabled then
+        SetEntityInvincible(ped, behavior.invincible)
+        if behavior.preventRagdoll then
+            SetPedCanRagdoll(ped, false)
+        end
+        local entity = noclipEntity()
+        if GetEntityType(entity) == 1 then
             ClearPedTasksImmediately(entity, false, false)
         end
-
-        FrozenEntity = entity
-        if Noclip.Behavior.freezeEntity and entity ~= 0 then
-            FreezeEntityPosition(entity, true)
-            SetEntityHeading(entity, TranslateHeading(entity, GetEntityHeading(entity)))
-        end
-
-        setEntityCollisionState(entity, false)
-
-        if Noclip.Behavior.invisible then
-            SetEntityVisible(ped, false, false)
-        else
-            SetEntityVisible(ped, true, false)
-        end
-
-        EnsureHudThread()
+        grab(entity)
+        SetEntityHeading(entity, translateHeading(entity, GetEntityHeading(entity)))
+        SetEntityVisible(ped, not behavior.invisible, false)
         return
     end
 
     SetEntityInvincible(ped, false)
-    setPedRagdollState(ped, true)
+    if behavior.preventRagdoll then
+        SetPedCanRagdoll(ped, true)
+    end
     SetEntityVisible(ped, true, false)
-
-    if FrozenEntity ~= nil and FrozenEntity ~= 0 and DoesEntityExist(FrozenEntity) then
-        if Noclip.Behavior.freezeEntity then
-            FreezeEntityPosition(FrozenEntity, false)
-        end
-        setEntityCollisionState(FrozenEntity, true)
-    end
-
-    FrozenEntity = nil
+    release()
 end
 
-function GetNoClipTarget()
-    local ped = PlayerPedId()
-    local veh = GetVehiclePedIsIn(ped, false)
-    local mount = GetMount(ped)
-    return (veh == 0 and (mount == 0 and ped or mount) or veh)
-end
-
-function TranslateHeading(entity, h)
-    if GetEntityType(entity) == 1 then
-        return (h + 180) % 360
-    end
-
-    return h
-end
-
-function DrawHudText(text, x, y, centered)
-    SetTextScale(0.30, 0.30)
-    SetTextColor(255, 255, 255, 255)
-    SetTextCentre(centered)
-    SetTextDropshadow(1, 0, 0, 0, 200)
-    SetTextFontForCurrentCommand(0)
-    DisplayText(CreateVarString(10, 'LITERAL_STRING', text), x, y)
-end
-
-local function DrawNoclipFixedHud()
-    DrawHudText(string.format('NOCLIP | Velocidade: %.1f (%d/%d)', Speed, SpeedIndex, #SpeedLevels), 0.5, 0.90, true)
-    DrawHudText(Noclip.HudHelpText, 0.5, 0.93, true)
-end
-
-EnsureHudThread = function()
-    if HudThreadRunning then
-        return
-    end
-
-    HudThreadRunning = true
-
-    CreateThread(function()
-        while Enabled and ShowHud do
-            DrawNoclipFixedHud()
-            Wait(0)
-        end
-
-        HudThreadRunning = false
-    end)
-end
-
-function SetSpeedIndex(value)
-    local index = math.floor(tonumber(value) or 1)
-    if index < 1 then index = 1 end
-    if index > #SpeedLevels then index = #SpeedLevels end
-
-    SpeedIndex = index
-    Speed = SpeedLevels[SpeedIndex]
-end
-
-function CheckControls(func, pad, controls)
-    if type(controls) == 'number' then
-        return func(pad, controls)
-    end
-
-    for _, control in ipairs(controls) do
-        if func(pad, control) then
-            return true
-        end
-    end
-
-    return false
-end
-
-function DisableControls(pad, controls)
-    if type(controls) == 'number' then
-        DisableControlAction(pad, controls, true)
-        return
-    end
-
-    for _, control in ipairs(controls) do
-        DisableControlAction(pad, control, true)
-    end
-end
+RegisterNetEvent('bilto_admin:client:setNoclip', setEnabled)
 
 CreateThread(function()
     while true do
-        if not Enabled then
-            Wait(Noclip.IdleWaitMs)
+        if enabled then
+            move()
+            Wait(0)
         else
-            local sleep = 0
-
-            DisableControls(0, Noclip.IncreaseSpeedControl)
-            DisableControls(0, Noclip.DecreaseSpeedControl)
-            DisableControls(0, Noclip.BlockedControls)
-
-            local forward = CheckControls(IsDisabledControlPressed, 0, Noclip.ForwardControl)
-            local backward = CheckControls(IsDisabledControlPressed, 0, Noclip.BackwardControl)
-            local moveLeft = CheckControls(IsDisabledControlPressed, 0, Noclip.LeftControl)
-            local moveRight = CheckControls(IsDisabledControlPressed, 0, Noclip.RightControl)
-            local movingUp = CheckControls(IsDisabledControlPressed, 0, Noclip.UpControl)
-            local movingDown = CheckControls(IsDisabledControlPressed, 0, Noclip.DownControl)
-            local speedUp = CheckControls(IsDisabledControlJustReleased, 0, Noclip.IncreaseSpeedControl)
-            local speedDown = CheckControls(IsDisabledControlJustReleased, 0, Noclip.DecreaseSpeedControl)
-
-            local anyInput = forward or backward or moveLeft or moveRight or movingUp or movingDown or speedUp or speedDown
-            if not anyInput then
-                Wait(sleep)
-                goto continue
-            end
-
-            DisableFirstPersonCamThisFrame()
-
-            local entity = GetNoClipTarget()
-            if entity ~= FrozenEntity then
-                if FrozenEntity and DoesEntityExist(FrozenEntity) then
-                    if Noclip.Behavior.freezeEntity then
-                        FreezeEntityPosition(FrozenEntity, false)
-                    end
-                    setEntityCollisionState(FrozenEntity, true)
-                end
-
-                FrozenEntity = entity
-                if Noclip.Behavior.freezeEntity and entity ~= 0 then
-                    FreezeEntityPosition(entity, true)
-                end
-                setEntityCollisionState(entity, false)
-            end
-
-            if entity == 0 or not DoesEntityExist(entity) then
-                Wait(0)
-                goto continue
-            end
-
-            local ped = PlayerPedId()
-            if Noclip.Behavior.invisible then
-                SetEntityVisible(ped, false, false)
-            else
-                SetEntityVisible(ped, true, false)
-            end
-
-            local coords = GetEntityCoords(entity)
-            local x, y, z = coords.x, coords.y, coords.z
-            local h = TranslateHeading(entity, GetEntityHeading(entity))
-
-            if speedUp then
-                SetSpeedIndex(SpeedIndex + 1)
-            end
-            if speedDown then
-                SetSpeedIndex(SpeedIndex - 1)
-            end
-
-            if movingUp then
-                z = z + Speed
-            end
-            if movingDown then
-                z = z - Speed
-            end
-
-            if forward or backward or moveLeft or moveRight then
-                local r = -h * math.pi / 180
-                local dx = Speed * math.sin(r)
-                local dy = Speed * math.cos(r)
-
-                if forward then
-                    x = x + dx
-                    y = y + dy
-                end
-
-                if backward then
-                    x = x - dx
-                    y = y - dy
-                end
-
-                if moveLeft then
-                    x = x - dy
-                    y = y + dx
-                end
-
-                if moveRight then
-                    x = x + dy
-                    y = y - dx
-                end
-            end
-
-            if forward or backward or moveLeft or moveRight or movingUp or movingDown then
-                local rot = GetGameplayCamRot(2)
-                h = rot.z
-            end
-
-            SetEntityCoordsNoOffset(entity, x, y, z)
-            SetEntityHeading(entity, TranslateHeading(entity, h))
-            Wait(sleep)
+            Wait(settings.idleWaitMs)
         end
-
-        ::continue::
     end
-end)
-
-RegisterNetEvent('bilto_admin:client:noclip:setEnabled', function(state)
-    local shouldEnable = state == true
-    if shouldEnable == Enabled then
-        return
-    end
-
-    ToggleNoclip()
 end)
 
 AddEventHandler('onResourceStop', function(resourceName)
-    if GetCurrentResourceName() == resourceName and Enabled then
-        ToggleNoclip()
+    if resourceName == GetCurrentResourceName() then
+        setEnabled(false)
     end
 end)

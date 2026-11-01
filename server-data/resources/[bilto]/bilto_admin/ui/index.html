@@ -216,8 +216,7 @@
                                             <th data-i18n="field_citizenid">Citizenid</th>
                                             <th data-i18n="permissions_th_access">Origem</th>
                                             <th data-i18n="permissions_th_all">All</th>
-                                            <th data-i18n="permissions_th_manage">Gerenciar</th>
-                                            <th data-i18n="permissions_th_status">Online</th>
+                                                <th data-i18n="permissions_th_status">Online</th>
                                             <th data-i18n="permissions_th_actions">Acoes</th>
                                         </tr>
                                     </thead>
@@ -232,30 +231,41 @@
         </div>
 
         <div id="jobModal" class="modal hidden">
-            <div class="modal-box">
+            <div class="modal-box job-modal-box">
                 <header>
                     <h3 data-i18n="modal_set_job_title">Setar Job</h3>
                     <button id="jobModalCloseBtn" type="button" class="danger" data-i18n="modal_close">Fechar</button>
                 </header>
-                <input id="jobSearchInput" type="search" placeholder="Buscar job" data-i18n-placeholder="modal_job_search_placeholder" />
-                <div id="jobCurrentInfo" class="helper-note"></div>
-                <div id="jobModalList" class="modal-list"></div>
-                <div class="form-stack">
-                    <label for="jobModalGradeSelect" data-i18n="modal_grade_label">Grade</label>
-                    <select id="jobModalGradeSelect"></select>
+                <div id="jobCurrentInfo" class="job-modal-summary"></div>
+                <div class="job-modal-layout">
+                    <section class="job-modal-column">
+                        <span class="job-modal-section-title" data-i18n="modal_job_jobs_title">Jobs</span>
+                        <input id="jobSearchInput" type="search" placeholder="Buscar job" data-i18n-placeholder="modal_job_search_placeholder" />
+                        <div id="jobModalList" class="job-modal-list"></div>
+                    </section>
+                    <section class="job-modal-column">
+                        <div id="jobSelectedInfo" class="job-modal-selected"></div>
+                        <div class="form-stack">
+                            <label for="jobModalGradeSelect" data-i18n="modal_grade_label">Grade</label>
+                            <select id="jobModalGradeSelect"></select>
+                        </div>
+                        <label class="permission-toggle-row" for="jobModalSetActiveInput">
+                            <span data-i18n="modal_job_set_active">Definir como job ativo</span>
+                            <input id="jobModalSetActiveInput" type="checkbox" checked />
+                        </label>
+                        <div class="inline-row">
+                            <button id="jobModalMultijobApplyBtn" data-requires-permission="upsertMultijobJob" type="button" data-i18n="modal_apply_multijob">Salvar na Multijob</button>
+                            <button id="jobModalApplyBtn" data-requires-permission="setJob" type="button" data-i18n="modal_apply_job">Aplicar Job no Jogador</button>
+                        </div>
+                        <div class="job-modal-multijob">
+                            <div class="job-modal-multijob-head">
+                                <span class="job-modal-section-title" data-i18n="modal_job_multijob_title">Multijob do jogador</span>
+                                <span id="jobMultijobInfo" class="job-modal-count"></span>
+                            </div>
+                            <div id="jobMultijobList" class="job-modal-multijob-list"></div>
+                        </div>
+                    </section>
                 </div>
-                <div class="form-stack">
-                    <label class="permission-toggle-row" for="jobModalSetActiveInput">
-                        <span data-i18n="modal_job_set_active">Definir como job ativo</span>
-                        <input id="jobModalSetActiveInput" type="checkbox" checked />
-                    </label>
-                </div>
-                <div class="inline-row">
-                    <button id="jobModalMultijobApplyBtn" data-requires-permission="upsertMultijobJob" type="button" data-i18n="modal_apply_multijob">Salvar na Multijob</button>
-                    <button id="jobModalApplyBtn" data-requires-permission="setJob" type="button" data-i18n="modal_apply_job">Aplicar Job no Jogador</button>
-                </div>
-                <div id="jobMultijobInfo" class="helper-note"></div>
-                <div id="jobMultijobList" class="history-list"></div>
             </div>
         </div>
 
@@ -574,15 +584,22 @@
         </div>
 
         <div id="companyStashModal" class="modal hidden">
-            <div class="modal-box modal-box-basic">
+            <div class="modal-box job-modal-box">
                 <header>
                     <h3 data-i18n="modal_company_stash_title">Baus de Empresas</h3>
                     <button id="companyStashModalCloseBtn" type="button" class="danger" data-i18n="modal_close">Fechar</button>
                 </header>
-                <input id="companyStashSearchInput" type="search" placeholder="Buscar bau por label/job" data-i18n-placeholder="modal_company_stash_search_placeholder" />
-                <div id="companyStashCurrentInfo" class="helper-note"></div>
-                <div id="companyStashModalList" class="modal-list"></div>
-                <button id="companyStashModalOpenBtn" type="button" data-i18n="modal_company_stash_open">Abrir Bau Selecionado</button>
+                <div class="job-modal-layout">
+                    <section class="job-modal-column">
+                        <span class="job-modal-section-title" data-i18n="modal_company_stash_list_title">Baus</span>
+                        <input id="companyStashSearchInput" type="search" placeholder="Buscar bau por label/job" data-i18n-placeholder="modal_company_stash_search_placeholder" />
+                        <div id="companyStashModalList" class="job-modal-list"></div>
+                    </section>
+                    <section class="job-modal-column">
+                        <div id="companyStashCurrentInfo" class="job-modal-selected"></div>
+                        <button id="companyStashModalOpenBtn" type="button" data-i18n="modal_company_stash_open">Abrir Bau Selecionado</button>
+                    </section>
+                </div>
             </div>
         </div>
 
@@ -606,10 +623,6 @@
                             <div class="helper-note permission-role-copy" data-i18n="permissions_role_picker_desc">As permissoes serao aplicadas automaticamente conforme o cargo selecionado.</div>
                         </div>
                         <h4 class="permission-section-title" data-i18n="permissions_options_title">Permissoes Disponiveis</h4>
-                        <label class="permission-toggle-row" for="permissionAddAllInput">
-                            <span data-i18n="permissions_all_toggle">All Permissao</span>
-                            <input id="permissionAddAllInput" type="checkbox" />
-                        </label>
                         <div id="permissionAddOptions" class="permission-check-grid"></div>
                     </section>
                 </div>
@@ -636,10 +649,6 @@
                             <div class="helper-note permission-role-copy" data-i18n="permissions_role_picker_desc">As permissoes serao aplicadas automaticamente conforme o cargo selecionado.</div>
                         </div>
                         <h4 class="permission-section-title" data-i18n="permissions_options_title">Permissoes Disponiveis</h4>
-                        <label class="permission-toggle-row" for="permissionEditAllInput">
-                            <span data-i18n="permissions_all_toggle">All Permissao</span>
-                            <input id="permissionEditAllInput" type="checkbox" />
-                        </label>
                         <div id="permissionEditOptions" class="permission-check-grid"></div>
                     </section>
                 </div>
@@ -696,7 +705,7 @@
                 <p id="criticalConfirmSummary" class="critical-confirm-summary"></p>
                 <ul id="criticalConfirmDetails" class="critical-confirm-details"></ul>
                 <div class="inline-row">
-                    <button id="criticalConfirmCancelBtn" type="button">Cancelar</button>
+                    <button id="criticalConfirmCancelBtn" type="button" data-i18n="critical_confirm_cancel">Cancelar</button>
                     <button id="criticalConfirmBtn" type="button" class="danger" disabled>Confirmar</button>
                 </div>
             </div>
